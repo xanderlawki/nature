@@ -1,0 +1,23 @@
+{
+  "name": "nature",
+  "version": "1.0.0",
+  "description": "learning backend development",
+  "main": "app.js",
+  "scripts": {
+    "start": "nodemon app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xanderlawki/nature.git"
+  },
+  "author": "xander",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/xanderlawki/nature/issues"
+  },
+  "homepage": "https://github.com/xanderlawki/nature#readme",
+  "dependencies": {
+    "express": "^4.17.1",
+    "nodemon": "^2.0.6"
+  }
+}
