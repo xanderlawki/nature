@@ -1,39 +1,64 @@
-const e = require('express')
+const path = require('path')
 const express = require('express')
-const fs = require('fs')
-
+const AppError = require('./utils/appError')
+const globalError = require("./controllers/errorController")
+const morgan = require('morgan')
+const tourRouter = require('./router/tours')
+const userRouter = require('./router/users')
+const reviewRouter = require('./router/reviews')
+const viewRouter = require('./router/views')
+const rateLimit = require('express-rate-limit')
+const helmet = require('helmet')
+const mongoSanitize = require('express-mongo-sanitize')
+const xss = require('xss-clean')
+const hpp = require('hpp')
 const app = express()
-const port = 3000
-app.use(express.json())
-const tours = JSON.parse(fs.readFileSync(`${__dirname}/dev-data/data/tours-simple.json`, 'utf-8'))
+app.set('view engine', 'pug')
+app.set('views', path.join(__dirname, 'views'))
+///secirity headers///
+app.use(helmet())
+/////body parser/////
+app.use(express.json({limit: '10kb'}))
+/////serving static files//////
+app.use(express.static(`${__dirname}/public`))
 
-app.get('/api/v1/tours', (req, res)=> {
-    res.status(200).json({
-        status: 'succes',
-        result: tours.length,
-        data: {
-            tours:tours,
-        }
+////data sanitization against nosql injection///
+app.use(mongoSanitize())
+
+///data sanitization against xss///
+app.use(xss())
+ 
+//////////parameter pollination///////
+app.use(hpp({
+    whitelist: ['duration', 'ratingsQuantity', 'ratingsAverage', 'maxGroupSize', 'difficulty', 'price']
+}))
+///////test middleware///////
+    app.use((req, res, next)=> {
+        req.requestTime = new Date().toISOString()
+        next()
     })
-})
 
-app.post('/api/v1/tours', (req,res)=> {
-    console.log(req.body)
-
-    const NewId = tours[tours.length - 1].id + 1;
-    const newTours = Object.assign({id: NewId}, req.body)
-    tours.push(newTours)
-    fs.writeFile(`${__dirname}/dev-data/data/tours-simple.json`, JSON.stringify(tours), (err)=> {
-        res.status(200).json({
-            status: 'succes',
-            result: tours.length,
-            data: {
-                tours:newTours,
-            }
-        })
+    ////development logging//
+    if(process.env.NODE_ENV === 'development') {
+        app.use(morgan('dev'))
+    }
+    /////limit rate api////
+    const limiter = rateLimit({
+        max: 100,
+        windowMs: 60 * 60 * 1000,
+        message: 'too many request with this ip lease try again in hour'
     })
+
+app.use('/api', limiter)
+
+app.use('/', viewRouter)
+app.use('/api/v1/tours', tourRouter)
+app.use('/api/v1/users', userRouter)
+app.use('/api/v1/reviews', reviewRouter)
+app.all('*', (req, res, next)=> {
     
+    next(new AppError (`cant find ${req.originalUrl} on this server`, 404))
 })
-app.listen(port, ()=> {
-    console.log(`app running on port ${port}`)
-})
+
+app.use(globalError)
+module.exports = app
